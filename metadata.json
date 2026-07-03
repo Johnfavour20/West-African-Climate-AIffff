@@ -2,5 +2,5 @@
   "name": "West African Climate AI",
   "description": "Artificial Intelligence-Based Climate Change Impact Prediction Portal for the ECOWAS Sub-Region.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE"]
 }
