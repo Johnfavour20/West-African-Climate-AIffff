@@ -610,7 +610,7 @@ export default function App() {
         )}
       </main>
 
-      {/* ACADEMIC FOOTER */}
+      {/* ACADEMIC FOOTER
       <footer className="bg-white border-t border-outline-variant py-6">
         <div className="flex flex-col md:flex-row justify-between items-center w-full px-6 md:px-12 max-w-7xl mx-auto text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
           <div>
@@ -622,8 +622,8 @@ export default function App() {
             <span>Matric No: U2022/5570029</span>
             <span>Department of Computer Science</span>
           </div>
-        </div>
-      </footer>
+        </div> */}
+      {/* </footer> */}
 
       {/* Auth Modal Overlay */}
       {isAuthModalOpen && (
