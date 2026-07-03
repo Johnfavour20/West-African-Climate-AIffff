@@ -10,30 +10,107 @@ import MapLayer from './components/MapLayer';
 import PredictivePanel from './components/PredictivePanel';
 import TrainingPanel from './components/TrainingPanel';
 import HistoricalPanel from './components/HistoricalPanel';
-import MethodologyPanel from './components/MethodologyPanel';
-import { 
-  Globe, 
-  Cpu, 
-  Terminal, 
-  Sliders, 
-  Database, 
-  Thermometer, 
-  Droplet, 
-  Sprout, 
-  BrainCircuit, 
-  ArrowRight, 
-  Layers, 
-  Compass, 
-  Sparkles, 
+import {
+  Globe,
+  Cpu,
+  Terminal,
+  Sliders,
+  Database,
+  Thermometer,
+  Droplet,
+  Sprout,
+  BrainCircuit,
+  ArrowRight,
+  Layers,
+  Compass,
+  Sparkles,
   CheckCircle,
   Menu,
   X
 } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'dashboard' | 'historical' | 'methodology' | 'training'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'dashboard' | 'historical' | 'training'>('overview');
   const [selectedCountry, setSelectedCountry] = useState<Country>(COUNTRIES[0]); // Default to Nigeria
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+
+  // User Auth States
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authEmail, setAuthEmail] = useState<string>('');
+  const [authPassword, setAuthPassword] = useState<string>('');
+  const [authFullname, setAuthFullname] = useState<string>('');
+  const [authError, setAuthError] = useState<string>('');
+  const [authSuccess, setAuthSuccess] = useState<string>('');
+
+  // Load user session on mount
+  useEffect(() => {
+    const savedUser = localStorage.getItem('currentUser');
+    if (savedUser) {
+      try {
+        setCurrentUser(JSON.parse(savedUser));
+      } catch (e) {
+        localStorage.removeItem('currentUser');
+      }
+    }
+  }, []);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    setAuthSuccess('');
+    try {
+      const res = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: authEmail, password: authPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Login failed');
+      }
+      setCurrentUser(data.user);
+      localStorage.setItem('currentUser', JSON.stringify(data.user));
+      setAuthSuccess('Logged in successfully!');
+      setTimeout(() => {
+        setIsAuthModalOpen(false);
+        setAuthEmail('');
+        setAuthPassword('');
+        setAuthSuccess('');
+      }, 1000);
+    } catch (err: any) {
+      setAuthError(err.message || 'Could not connect to Flask server.');
+    }
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    setAuthSuccess('');
+    try {
+      const res = await fetch('http://localhost:5000/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fullname: authFullname, email: authEmail, password: authPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Registration failed');
+      }
+      setAuthSuccess('Registration successful! Please sign in.');
+      setAuthMode('login');
+      setAuthFullname('');
+      setAuthPassword('');
+    } catch (err: any) {
+      setAuthError(err.message || 'Could not connect to Flask server.');
+    }
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('currentUser');
+  };
 
   // Animated bars state for miniature hero training chart
   const [miniBars, setMiniBars] = useState<number[]>([65, 80, 50, 75, 85, 70, 80, 35, 75, 50, 65, 45]);
@@ -57,11 +134,11 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col justify-between selection:bg-secondary-container selection:text-on-secondary-fixed">
-      
+
       {/* NAVIGATION BAR */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-outline-variant h-16 shadow-sm">
         <div className="flex justify-between items-center w-full px-6 md:px-12 max-w-7xl mx-auto h-full">
-          <div 
+          <div
             className="font-headline-md text-xl md:text-2xl font-bold text-primary cursor-pointer flex items-center gap-2"
             onClick={() => setActiveTab('overview')}
           >
@@ -73,47 +150,59 @@ export default function App() {
           <div className="hidden lg:flex items-center space-x-8">
             <button
               onClick={() => setActiveTab('overview')}
-              className={`font-label-md text-xs uppercase tracking-wider pb-1 transition-all cursor-pointer ${
-                activeTab === 'overview'
-                  ? 'text-primary border-b-2 border-primary font-bold'
-                  : 'text-on-surface-variant hover:text-primary'
-              }`}
+              className={`font-label-md text-xs uppercase tracking-wider pb-1 transition-all cursor-pointer ${activeTab === 'overview'
+                ? 'text-primary border-b-2 border-primary font-bold'
+                : 'text-on-surface-variant hover:text-primary'
+                }`}
             >
               Overview
             </button>
             <button
               onClick={() => setActiveTab('dashboard')}
-              className={`font-label-md text-xs uppercase tracking-wider pb-1 transition-all cursor-pointer ${
-                activeTab === 'dashboard'
-                  ? 'text-primary border-b-2 border-primary font-bold'
-                  : 'text-on-surface-variant hover:text-primary'
-              }`}
+              className={`font-label-md text-xs uppercase tracking-wider pb-1 transition-all cursor-pointer ${activeTab === 'dashboard'
+                ? 'text-primary border-b-2 border-primary font-bold'
+                : 'text-on-surface-variant hover:text-primary'
+                }`}
             >
               Predictive Dashboard
             </button>
             <button
               onClick={() => setActiveTab('historical')}
-              className={`font-label-md text-xs uppercase tracking-wider pb-1 transition-all cursor-pointer ${
-                activeTab === 'historical'
-                  ? 'text-primary border-b-2 border-primary font-bold'
-                  : 'text-on-surface-variant hover:text-primary'
-              }`}
+              className={`font-label-md text-xs uppercase tracking-wider pb-1 transition-all cursor-pointer ${activeTab === 'historical'
+                ? 'text-primary border-b-2 border-primary font-bold'
+                : 'text-on-surface-variant hover:text-primary'
+                }`}
             >
               Historical Data
             </button>
-            <button
-              onClick={() => setActiveTab('methodology')}
-              className={`font-label-md text-xs uppercase tracking-wider pb-1 transition-all cursor-pointer ${
-                activeTab === 'methodology'
-                  ? 'text-primary border-b-2 border-primary font-bold'
-                  : 'text-on-surface-variant hover:text-primary'
-              }`}
-            >
-              Methodology
-            </button>
           </div>
 
-          <div className="hidden lg:block">
+          <div className="hidden lg:flex items-center space-x-4">
+            {currentUser ? (
+              <div className="flex items-center space-x-3">
+                <span className="text-xs font-semibold text-slate-700">
+                  Hi, <span className="font-bold text-[#003527]">{currentUser.fullname}</span>
+                </span>
+                <button
+                  onClick={handleLogout}
+                  className="text-xs font-bold text-red-650 hover:text-red-700 text-red-600 cursor-pointer border border-red-200 px-3 py-1.5 rounded bg-red-50 hover:bg-red-100 transition-all"
+                >
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  setAuthMode('login');
+                  setAuthError('');
+                  setAuthSuccess('');
+                  setIsAuthModalOpen(true);
+                }}
+                className="text-xs font-bold text-[#003527] border border-[#003527] hover:bg-[#003527]/10 px-4 py-2.5 rounded transition-all cursor-pointer"
+              >
+                Sign In
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('dashboard')}
               className="bg-[#003527] text-white border border-emerald-800 font-label-md text-xs uppercase tracking-wider font-bold px-5 py-2.5 rounded shadow-sm hover:bg-emerald-900 active:scale-95 transition-all cursor-pointer"
@@ -123,9 +212,10 @@ export default function App() {
           </div>
 
           {/* Mobile Menu Button */}
-          <button 
+          <button
             className="lg:hidden p-2 text-slate-700 cursor-pointer"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            aria-label="Toggle Menu"
           >
             {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
@@ -137,8 +227,7 @@ export default function App() {
             {[
               { id: 'overview', label: 'Overview' },
               { id: 'dashboard', label: 'Predictive Dashboard' },
-              { id: 'historical', label: 'Historical Data' },
-              { id: 'methodology', label: 'Methodology' }
+              { id: 'historical', label: 'Historical Data' }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -146,9 +235,8 @@ export default function App() {
                   setActiveTab(tab.id as any);
                   setIsMobileMenuOpen(false);
                 }}
-                className={`text-left text-sm font-semibold py-1.5 ${
-                  activeTab === tab.id ? 'text-primary border-l-4 border-primary pl-2' : 'text-slate-600'
-                }`}
+                className={`text-left text-sm font-semibold py-1.5 ${activeTab === tab.id ? 'text-primary border-l-4 border-primary pl-2' : 'text-slate-600'
+                  }`}
               >
                 {tab.label}
               </button>
@@ -162,13 +250,44 @@ export default function App() {
             >
               Launch Prediction Engine
             </button>
+            <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
+              {currentUser ? (
+                <div className="flex flex-col gap-2">
+                  <span className="text-xs font-semibold text-slate-700">
+                    Logged in as: <span className="font-bold text-[#003527]">{currentUser.fullname}</span>
+                  </span>
+                  <button
+                    onClick={() => {
+                      handleLogout();
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="w-full text-center text-xs font-bold text-white bg-red-600 hover:bg-red-700 py-2 rounded transition-all cursor-pointer"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setAuthMode('login');
+                    setAuthError('');
+                    setAuthSuccess('');
+                    setIsAuthModalOpen(true);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="w-full text-center text-xs font-bold text-[#003527] border border-[#003527] py-2 rounded hover:bg-[#003527]/5 transition-all cursor-pointer"
+                >
+                  Sign In / Register
+                </button>
+              )}
+            </div>
           </div>
         )}
       </nav>
 
       {/* MAIN BODY WORKSPACE */}
       <main className="flex-1 pt-16">
-        
+
         {/* OVERVIEW TAB VIEW */}
         {activeTab === 'overview' && (
           <div>
@@ -197,23 +316,17 @@ export default function App() {
                       <span>Access AI Dashboard</span>
                       <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                     </button>
-                    <button
-                      onClick={() => setActiveTab('methodology')}
-                      className="bg-white border border-slate-300 text-primary font-label-md text-xs font-bold px-8 py-4 rounded-lg hover:bg-slate-50 transition-all cursor-pointer"
-                    >
-                      View Methodology
-                    </button>
                   </div>
                 </div>
 
                 {/* Training Metric miniature Card */}
                 <div className="lg:w-2/5 w-full flex justify-center">
-                  <div 
+                  <div
                     onClick={() => setActiveTab('training')}
                     className="w-full aspect-square max-w-md bg-white border border-outline-variant p-6 rounded shadow-lg relative overflow-hidden flex flex-col justify-between cursor-pointer group hover:border-primary transition-all duration-300"
                   >
                     <div className="absolute top-0 left-0 right-0 h-1.5 bg-primary"></div>
-                    
+
                     <div className="flex justify-between items-center">
                       <span className="font-label-md text-xs uppercase text-slate-500 tracking-wider">Live Training Metrics</span>
                       <span className="font-mono-data text-xs text-primary font-bold animate-pulse flex items-center gap-1">
@@ -227,7 +340,7 @@ export default function App() {
                         let colorClass = 'bg-[#95d3ba]'; // primary-fixed-dim
                         if (idx === 4 || idx === 7) colorClass = 'bg-[#fe932c] animate-pulse'; // orange
                         else if (idx % 2 === 0) colorClass = 'bg-[#003527]'; // primary emerald
-                        
+
                         return (
                           <div
                             key={idx}
@@ -373,7 +486,7 @@ export default function App() {
                 {/* Hotlinked academic images cards row */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
                   <div className="flex items-start space-x-4 p-4 rounded bg-emerald-950/10 border border-emerald-900/30">
-                    <div 
+                    <div
                       className="w-16 h-16 rounded bg-cover bg-center shrink-0 border border-emerald-800"
                       style={{ backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuDfv-fvRdA7SbZZmpU9pKPMs800HnZE50_Jf5H40-eM7vvQrxpLO6w4Jz3GYVRwXFKp010m34aqSXc3iClJkluBEeA1Qlc1RLExJovzeL0Y72ZfmblSTEdYAFcYnaP_zGO_pglPA7tGdEokVJeZYLxArcAiwz-GWdkCIF4U6LqGEtse3_L6mt3zOCzHCthOYqj5EPgTgxUCza7HFzE_v-jCjXMn42XswZgb4C7pifgAcvGhVGi_dt-tag')" }}
                     ></div>
@@ -384,7 +497,7 @@ export default function App() {
                   </div>
 
                   <div className="flex items-start space-x-4 p-4 rounded bg-emerald-950/10 border border-emerald-900/30">
-                    <div 
+                    <div
                       className="w-16 h-16 rounded bg-cover bg-center shrink-0 border border-emerald-800"
                       style={{ backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuCNNe46R0EUUAQs3fvKJdsRaRARHzNAP15yHM5oOvbhnWczA6QdRmxS__ks5RxxuDEkkO9UO1IzyJ-ZomK2lmIZZ5DGaXPwm-kzrIgGyw9deQ2IfX7anWoBqoAfi_1HV1wF8v8YCD8bCubLC2GPdzMp-PrZlmLLCXrLskA7pWU_vX3M3aQ-NUyGbLYfGRpU9qHmuch9uQWF0Egmll7f_WYzP3PPY-kJQkJAlFGWfQjeDGRx8XsUd7Yn-w')" }}
                     ></div>
@@ -395,7 +508,7 @@ export default function App() {
                   </div>
 
                   <div className="flex items-start space-x-4 p-4 rounded bg-emerald-950/10 border border-emerald-900/30">
-                    <div 
+                    <div
                       className="w-16 h-16 rounded bg-cover bg-center shrink-0 border border-emerald-800"
                       style={{ backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuANi-K75YCxFQLIAeNnN7z4QRYIqo2FKwupkxKIqrQr_KcNHs9TYrCVxX5vgO7dEJmETVmXUmJ1SD8KHTSQpuWEVZCz3kd53krXfKDNqrJdgtw_PmLNzLETcaZ9WyWVD9OUw-BYZubuHd4rToPWvmdJpRvkgWr7NdusumaPId8Vw3r_FW9fdFdinDSROot-_U6bF6z4Y8sZecK4nDpY1M9HT85B0Pp4ri4ivElHArdJq-c9NZM-XBk-ew')" }}
                     ></div>
@@ -419,9 +532,9 @@ export default function App() {
                 <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-stretch">
                   {/* Left Column: Interactive Spatial Layer */}
                   <div className="xl:col-span-8">
-                    <MapLayer 
-                      selectedCountry={selectedCountry} 
-                      onSelectCountry={handleSelectCountry} 
+                    <MapLayer
+                      selectedCountry={selectedCountry}
+                      onSelectCountry={handleSelectCountry}
                     />
                   </div>
 
@@ -443,7 +556,7 @@ export default function App() {
                     </div>
 
                     {/* Confidence score card */}
-                    <div 
+                    <div
                       onClick={() => setActiveTab('dashboard')}
                       className="bg-primary text-white p-6 rounded shadow-xl flex flex-col justify-between h-[210px] cursor-pointer group hover:bg-primary-container transition-all"
                     >
@@ -453,7 +566,7 @@ export default function App() {
                           <h4 className="font-headline-md text-xl font-bold">Prediction Confidence</h4>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-end justify-between border-t border-emerald-950 pt-4 mt-4">
                         <div className="text-4xl font-extrabold font-mono-data text-emerald-300">92%</div>
                         <div className="text-[10px] font-mono text-slate-400">Validated Batch #2904</div>
@@ -489,13 +602,6 @@ export default function App() {
           </section>
         )}
 
-        {/* METHODOLOGY TAB */}
-        {activeTab === 'methodology' && (
-          <section className="py-12 px-6 md:px-12 max-w-7xl mx-auto animate-fade-in">
-            <MethodologyPanel />
-          </section>
-        )}
-
         {/* TRAINING TAB */}
         {activeTab === 'training' && (
           <section className="py-12 px-6 md:px-12 max-w-7xl mx-auto animate-fade-in">
@@ -510,7 +616,7 @@ export default function App() {
           <div>
             © 2026 ALL RIGHTS RESERVED
           </div>
-          
+
           <div className="flex flex-col md:flex-row items-center md:space-x-8 text-center md:text-right mt-3 md:mt-0">
             <span>Researcher: Okafor Chukwuoma Deborah</span>
             <span>Matric No: U2022/5570029</span>
@@ -518,6 +624,105 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {/* Auth Modal Overlay */}
+      {isAuthModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-outline-variant shadow-2xl rounded-lg max-w-sm w-full p-6 relative animate-fade-in space-y-4">
+            <button
+              onClick={() => setIsAuthModalOpen(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 cursor-pointer"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="text-center">
+              <h3 className="font-headline-md text-lg text-primary font-bold">
+                {authMode === 'login' ? 'Sign In to Portal' : 'Register Account'}
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                {authMode === 'login'
+                  ? 'Access prediction training model tools.'
+                  : 'Create a researcher profile to manage datasets.'}
+              </p>
+            </div>
+
+            {authError && (
+              <div className="bg-red-50 border border-red-200 text-red-600 text-xs p-3 rounded font-semibold animate-shake">
+                {authError}
+              </div>
+            )}
+            {authSuccess && (
+              <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs p-3 rounded font-semibold">
+                {authSuccess}
+              </div>
+            )}
+
+            <form onSubmit={authMode === 'login' ? handleLogin : handleRegister} className="space-y-3">
+              {authMode === 'register' && (
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={authFullname}
+                    onChange={(e) => setAuthFullname(e.target.value)}
+                    placeholder="Dr. Deborah Okafor"
+                    className="w-full border border-slate-200 rounded p-2.5 text-xs focus:border-primary focus:outline-none"
+                  />
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Email Address</label>
+                <input
+                  type="email"
+                  required
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  placeholder="researcher@climatedata.org"
+                  className="w-full border border-slate-200 rounded p-2.5 text-xs focus:border-primary focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Password</label>
+                <input
+                  type="password"
+                  required
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full border border-slate-200 rounded p-2.5 text-xs focus:border-primary focus:outline-none"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-[#003527] hover:bg-[#002219] text-white font-bold text-xs uppercase py-3 rounded shadow transition-all cursor-pointer mt-4"
+              >
+                {authMode === 'login' ? 'Sign In' : 'Register'}
+              </button>
+            </form>
+
+            <div className="text-center pt-2 border-t border-slate-100">
+              <button
+                onClick={() => {
+                  setAuthMode(authMode === 'login' ? 'register' : 'login');
+                  setAuthError('');
+                  setAuthSuccess('');
+                }}
+                className="text-xs text-primary font-bold hover:underline cursor-pointer"
+              >
+                {authMode === 'login'
+                  ? 'Need a researcher account? Register here'
+                  : 'Already have an account? Sign In'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

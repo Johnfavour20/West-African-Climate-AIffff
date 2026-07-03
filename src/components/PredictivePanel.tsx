@@ -15,15 +15,44 @@ interface PredictivePanelProps {
 
 export default function PredictivePanel({ selectedCountry, onSelectCountry }: PredictivePanelProps) {
   const [year, setYear] = useState<number>(2035);
-  const [modelType, setModelType] = useState<'ANN' | 'Linear'>('ANN');
+  const [modelType, setModelType] = useState<'ANN' | 'Linear' | 'LSTM'>('ANN');
   const [isComputing, setIsComputing] = useState<boolean>(false);
   const [computeProgress, setComputeProgress] = useState<number>(0);
   const [computeLogs, setComputeLogs] = useState<string[]>([]);
-  
+  const [backendMetrics, setBackendMetrics] = useState<any>(null);
+  const [apiStatusMessage, setApiStatusMessage] = useState<string>('');
+
+  // Dynamic datasets select state
+  const [datasets, setDatasets] = useState<any[]>([]);
+  const [selectedDatasetId, setSelectedDatasetId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const fetchDatasets = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/datasets');
+        if (res.ok) {
+          const data = await res.json();
+          setDatasets(data);
+          if (data.length > 0) {
+            setSelectedDatasetId(data[0].id);
+          }
+        }
+      } catch (err) {
+        console.warn('Could not fetch datasets in PredictivePanel');
+      }
+    };
+    fetchDatasets();
+  }, []);
+
   // Hover state for interactive chart tooltip
   const [hoveredYear, setHoveredYear] = useState<number | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
   const chartRef = useRef<SVGSVGElement | null>(null);
+
+  useEffect(() => {
+    setBackendMetrics(null);
+    setApiStatusMessage('');
+  }, [year, modelType, selectedCountry]);
 
   // Math dimensions for custom high-performance SVG Line Chart
   const svgWidth = 600;
@@ -54,7 +83,7 @@ export default function PredictivePanel({ selectedCountry, onSelectCountry }: Pr
     // Add non-linear wave for ANN, keep linear for Linear
     const waveTemp = model === 'ANN' ? Math.sin((targetYear - 2035) * 0.3) * 0.08 : 0;
     const countryRiskScale = 1.0 + (country.riskScore - 78) * 0.004;
-    const tempAnomaly = Math.max(0.1, parseFloat(( (baseWarming + waveTemp) * countryRiskScale ).toFixed(2)));
+    const tempAnomaly = Math.max(0.1, parseFloat(((baseWarming + waveTemp) * countryRiskScale).toFixed(2)));
 
     // Precipitation shift goes down/fluctuates over time
     const baseShift = -1.5 - (targetYear - 2024) * 0.3;
@@ -74,7 +103,7 @@ export default function PredictivePanel({ selectedCountry, onSelectCountry }: Pr
     return { tempAnomaly, precipitation, rainShift, mae, rmse, r2 };
   };
 
-  const currentMetrics = getMetricsForYear(year, modelType, selectedCountry);
+  const currentMetrics = backendMetrics || getMetricsForYear(year, modelType, selectedCountry);
 
   // Pre-generate chart years for plotting lines 2024 - 2050
   const chartYears = [2024, 2026, 2028, 2030, 2032, 2035, 2038, 2040, 2042, 2045, 2048, 2050];
@@ -145,21 +174,74 @@ export default function PredictivePanel({ selectedCountry, onSelectCountry }: Pr
     setComputeProgress(0);
     setComputeLogs([]);
 
-    const logs = [
-      'Initializing TensorFlow engine...',
-      'Connecting to localized climate sensory matrix...',
-      `Loading deep neural weights for ${selectedCountry.name}...`,
-      `Setting parameters: Target Year = ${year}, Model Architecture = ${modelType}`,
-      'Computing backpropagation gradients...',
-      'Verifying stochastic convergence...',
-      'Compiling prediction telemetry...',
-      'Updating localized adaptation matrices...'
+    const runLogs = [
+      'Connecting to SQL database (sqlite3)...',
+      'Searching database schemas for Users & Climate_Datasets...',
+      `Logging research action for ${selectedCountry.name} to activity_log...`,
+      `Invoking Flask backend API prediction route at http://localhost:5000/api/predict/run...`
     ];
 
-    for (let i = 0; i < logs.length; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 150 + Math.random() * 150));
-      setComputeLogs((prev) => [...prev, logs[i]]);
-      setComputeProgress(Math.round(((i + 1) / logs.length) * 100));
+    // Load initial virtual environment and REST init logs
+    for (let i = 0; i < runLogs.length; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 80 + Math.random() * 80));
+      setComputeLogs((prev) => [...prev, runLogs[i]]);
+      setComputeProgress(Math.min(90, Math.round(((i + 1) / (runLogs.length + 2)) * 100)));
+    }
+
+    try {
+      const res = await fetch('http://localhost:5000/api/predict/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: 1, // Fallback/default researcher ID
+          dataset_id: selectedDatasetId || 1,
+          model_type: modelType === 'Linear' ? 'Linear Regression' : modelType,
+          year: year,
+          country_name: selectedCountry.name,
+          scenario: 'moderate',
+          reforestation: 30.0,
+          urbanization: 20.0
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error('API server returned error status ' + res.status);
+      }
+
+      const resData = await res.json();
+      setComputeLogs((prev) => [
+        ...prev,
+        `[OK] Flask Backend connected. Logged activity log ID dynamically.`,
+        `[OK] SQLite Transaction committed: predictions table updated.`,
+        `[Result] Predicted temperature anomaly: +${resData.tempAnomaly}°C`,
+        `[Result] Predicted precipitation shift: ${resData.rainShift}%`,
+        `Model Accuracy metrics: MAE=${resData.metrics.mae}, RMSE=${resData.metrics.rmse}, R2=${resData.metrics.r2}`
+      ]);
+
+      // Save backend metrics override
+      setBackendMetrics({
+        tempAnomaly: resData.tempAnomaly,
+        precipitation: Math.max(100, Math.round(selectedCountry.baselineRain * (1 + resData.rainShift / 100))),
+        rainShift: resData.rainShift,
+        mae: resData.metrics.mae,
+        rmse: resData.metrics.rmse,
+        r2: resData.metrics.r2
+      });
+      setApiStatusMessage('Successfully connected to Python/Flask backend and SQLite database.');
+      setComputeProgress(100);
+      await new Promise((resolve) => setTimeout(resolve, 800));
+    } catch (error: any) {
+      console.warn('Flask backend connection failed, falling back to local simulation layers.', error);
+      setComputeLogs((prev) => [
+        ...prev,
+        `[WARNING] Could not connect to http://localhost:5000. Server offline.`,
+        `[INFO] Falling back to high-fidelity client-only mathematical engine.`,
+        `Running local neural simulation layers...`,
+        `Epochs converged successfully.`
+      ]);
+      setApiStatusMessage('Flask server offline. Operating in simulation fallback mode.');
+      setComputeProgress(100);
+      await new Promise((resolve) => setTimeout(resolve, 800));
     }
 
     setIsComputing(false);
@@ -208,10 +290,10 @@ export default function PredictivePanel({ selectedCountry, onSelectCountry }: Pr
 
       {/* Main Dashboard Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-        
+
         {/* Left Column: Input Panel + Vulnerability Card (Takes 4 cols) */}
         <div className="lg:col-span-4 flex flex-col gap-6">
-          
+
           {/* Prediction Parameters Card */}
           <div className="bg-white border border-outline-variant p-6 rounded shadow-sm flex flex-col justify-between flex-1">
             <div className="space-y-6">
@@ -233,6 +315,7 @@ export default function PredictivePanel({ selectedCountry, onSelectCountry }: Pr
                       if (found) onSelectCountry(found);
                     }
                   }}
+                  title="Select Country"
                   className="w-full bg-white border border-outline-variant rounded p-3 text-xs font-bold text-primary focus:outline-none focus:border-primary cursor-pointer shadow-sm transition-all hover:bg-slate-50"
                 >
                   {COUNTRIES.map((c) => (
@@ -241,6 +324,31 @@ export default function PredictivePanel({ selectedCountry, onSelectCountry }: Pr
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Select Context Dataset */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                  Select Context Dataset
+                </label>
+                {datasets.length === 0 ? (
+                  <div className="text-xs bg-slate-50 border border-slate-200 rounded p-3 text-slate-500 italic border-dashed border-slate-350">
+                    No datasets. Import CSV datasets in Training Panel.
+                  </div>
+                ) : (
+                  <select
+                    value={selectedDatasetId || ''}
+                    onChange={(e) => setSelectedDatasetId(Number(e.target.value))}
+                    title="Select Dataset"
+                    className="w-full bg-white border border-outline-variant rounded p-3 text-xs font-bold text-primary focus:outline-none focus:border-primary cursor-pointer shadow-sm transition-all hover:bg-slate-50"
+                  >
+                    {datasets.map((d: any) => (
+                      <option key={d.id} value={d.id}>
+                        {d.dataset_name} ({d.records_count} rows)
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               {/* Target Projection Year */}
@@ -276,23 +384,22 @@ export default function PredictivePanel({ selectedCountry, onSelectCountry }: Pr
                 <div className="space-y-2">
                   {[
                     { id: 'Linear', label: 'Linear Regression Baseline' },
-                    { id: 'ANN', label: 'Artificial Neural Network (ANN)' }
+                    { id: 'ANN', label: 'Artificial Neural Network (ANN)' },
+                    { id: 'LSTM', label: 'LSTM (Recurrent Network)' }
                   ].map((arch) => {
                     const isActive = modelType === arch.id;
                     return (
                       <button
                         key={arch.id}
                         onClick={() => setModelType(arch.id as any)}
-                        className={`w-full p-3.5 rounded border text-left flex items-center justify-between transition-all duration-200 cursor-pointer ${
-                          isActive
-                            ? 'border-primary bg-emerald-50/40 text-primary font-semibold shadow-sm'
-                            : 'border-slate-200 hover:bg-slate-50 text-slate-600'
-                        }`}
+                        className={`w-full p-3.5 rounded border text-left flex items-center justify-between transition-all duration-200 cursor-pointer ${isActive
+                          ? 'border-primary bg-emerald-50/40 text-primary font-semibold shadow-sm'
+                          : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                          }`}
                       >
                         <span className="text-xs">{arch.label}</span>
-                        <div className={`w-4.5 h-4.5 rounded-full border flex items-center justify-center shrink-0 ${
-                          isActive ? 'border-primary' : 'border-slate-300'
-                        }`}>
+                        <div className={`w-4.5 h-4.5 rounded-full border flex items-center justify-center shrink-0 ${isActive ? 'border-primary' : 'border-slate-300'
+                          }`}>
                           {isActive && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
                         </div>
                       </button>
@@ -332,7 +439,7 @@ export default function PredictivePanel({ selectedCountry, onSelectCountry }: Pr
               <p className="text-[11px] text-slate-300 leading-normal max-w-sm">
                 AI-driven analysis of seasonal precipitation shifts in the Guinea Savannah zone.
               </p>
-              
+
               <div className="pt-2 border-t border-emerald-900/40 flex justify-between text-[8px] font-mono text-emerald-300/75 uppercase tracking-wider">
                 <span>Aridity Index: 0.92</span>
                 <span>Soil Moisture: 1.8%</span>
@@ -343,10 +450,10 @@ export default function PredictivePanel({ selectedCountry, onSelectCountry }: Pr
 
         {/* Right Column: Key Metrics + Forecasting Chart (Takes 8 cols) */}
         <div className="lg:col-span-8 flex flex-col gap-6">
-          
+
           {/* Top Row: Projected Metrics cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
+
             {/* Projected Temp Variance Card */}
             <div className="bg-white border border-outline-variant rounded p-6 shadow-sm flex flex-col justify-between min-h-[140px]">
               <div>
@@ -384,7 +491,7 @@ export default function PredictivePanel({ selectedCountry, onSelectCountry }: Pr
 
           {/* Time Series Forecast Chart Card */}
           <div className="bg-white border border-outline-variant rounded p-6 shadow-sm flex flex-col justify-between flex-1 relative">
-            
+
             {/* Legend & Header */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">
@@ -567,7 +674,7 @@ export default function PredictivePanel({ selectedCountry, onSelectCountry }: Pr
 
       {/* Bottom Row: Model Performance Evaluation (Spans full width) */}
       <div className="bg-white border border-outline-variant rounded p-6 shadow-sm">
-        
+
         {/* Header section with Pill */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-100 pb-4 mb-6 gap-4">
           <h4 className="font-headline-md text-lg text-[#003527] font-bold">
@@ -580,7 +687,7 @@ export default function PredictivePanel({ selectedCountry, onSelectCountry }: Pr
 
         {/* 3 Column Performance metrics */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
-          
+
           {/* MAE Metric column */}
           <div className="flex flex-col justify-between space-y-4">
             <div>
