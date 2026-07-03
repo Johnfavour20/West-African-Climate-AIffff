@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.neural_network import MLPRegressor
-from sklearn.metrics import mean_absolute_error, root_mean_square_error, r2_score
+from sklearn.metrics import mean_absolute_error, root_mean_squared_error, r2_score
 import joblib
 
 from models import db, User, ClimateDataset, PredictionModel, Prediction, ActivityLog
